@@ -15,6 +15,14 @@ It is designed for article explanations, system architecture diagrams, process d
 
 The default template renders a dark hand-drawn architecture diagram with moving flow highlights, pulsing modules, subtle grain, vignette, and a top-right hand-drawn signature.
 
+### Claude Loops
+
+![Claude Loops animated architecture diagram](./assets/previews/claude-loops.gif)
+
+### Memory Pack
+
+![Memory Pack animated architecture diagram](./assets/previews/memory-pack.gif)
+
 ## Features
 
 - Generates `.excalidraw`, `.png`, and animated `.gif` from one JSON spec
@@ -176,7 +184,10 @@ lanshu-animated-architecture-diagram/
 ├── agents/
 │   └── openai.yaml
 ├── assets/
-│   └── default-spec.json
+│   ├── default-spec.json
+│   └── previews/
+│       ├── claude-loops.gif
+│       └── memory-pack.gif
 ├── references/
 │   └── spec-format.md
 └── scripts/
