@@ -31,6 +31,7 @@ class PortabilityAuditTest(unittest.TestCase):
             "preview_gifs_load",
             "default_spec_loads",
             "python_dependencies_available",
+            "ffprobe_available",
             "no_machine_local_paths",
             "font_candidates_start_with_bundled_assets",
         ]:

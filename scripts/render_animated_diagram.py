@@ -4,6 +4,8 @@ import json
 import math
 import os
 import random
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -715,6 +717,85 @@ def frame_diff_report(gif_path):
     return {"frames": frame_count, "diffs": diffs}
 
 
+def parse_rate(rate):
+    if not rate or rate == "0/0":
+        return None
+    if "/" not in rate:
+        try:
+            return float(rate)
+        except ValueError:
+            return None
+    numerator, denominator = rate.split("/", 1)
+    try:
+        denominator_value = float(denominator)
+        if denominator_value == 0:
+            return None
+        return float(numerator) / denominator_value
+    except ValueError:
+        return None
+
+
+def resolve_tool(name):
+    executable = shutil.which(name)
+    if executable:
+        return executable
+    candidates = []
+    user_path = os.environ.get("Path", "")
+    for entry in user_path.split(os.pathsep):
+        if entry:
+            candidates.append(Path(entry) / f"{name}.exe")
+            candidates.append(Path(entry) / name)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        winget_packages = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+        candidates.extend(winget_packages.glob(f"**/{name}.exe"))
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def ffprobe_media_report(gif_path):
+    executable = resolve_tool("ffprobe")
+    if not executable:
+        return {"available": False}
+    command = [
+        executable,
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-count_frames",
+        "-show_entries",
+        "stream=width,height,r_frame_rate,avg_frame_rate,nb_read_frames",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
+        str(gif_path),
+    ]
+    completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if completed.returncode != 0:
+        return {"available": True, "ok": False, "error": completed.stderr.strip()}
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        return {"available": True, "ok": False, "error": str(exc)}
+    stream = (payload.get("streams") or [{}])[0]
+    media_format = payload.get("format") or {}
+    return {
+        "available": True,
+        "ok": True,
+        "path": executable,
+        "width": stream.get("width"),
+        "height": stream.get("height"),
+        "frames": int(stream.get("nb_read_frames", 0) or 0),
+        "r_frame_rate": parse_rate(stream.get("r_frame_rate")),
+        "avg_frame_rate": parse_rate(stream.get("avg_frame_rate")),
+        "duration": float(media_format.get("duration", 0) or 0),
+    }
+
+
 def check_outputs(result, spec):
     canvas = spec.get("canvas", {})
     expected_width = canvas.get("width", DEFAULT_W)
@@ -739,6 +820,31 @@ def check_outputs(result, spec):
             {"name": "gif_frames", "ok": gif_frames == expected_frames, "expected": expected_frames, "actual": gif_frames},
             {"name": "gif_fps", "ok": duration_ms == int(1000 / expected_fps), "expected": expected_fps, "actual": actual_fps},
         ]
+    )
+
+    ffprobe_report = ffprobe_media_report(gif_path)
+    checks.append({"name": "ffprobe_available", "ok": ffprobe_report.get("available", False), "path": ffprobe_report.get("path")})
+    expected_duration = expected_frames / expected_fps
+    checks.append(
+        {
+            "name": "ffprobe_media_parameters",
+            "ok": (
+                ffprobe_report.get("ok", False)
+                and ffprobe_report.get("width") == expected_width
+                and ffprobe_report.get("height") == expected_height
+                and ffprobe_report.get("frames") == expected_frames
+                and abs((ffprobe_report.get("avg_frame_rate") or 0) - expected_fps) < 0.01
+                and abs((ffprobe_report.get("duration") or 0) - expected_duration) < 0.02
+            ),
+            "expected": {
+                "width": expected_width,
+                "height": expected_height,
+                "frames": expected_frames,
+                "fps": expected_fps,
+                "duration": expected_duration,
+            },
+            "actual": ffprobe_report,
+        }
     )
 
     diff_report = frame_diff_report(gif_path)

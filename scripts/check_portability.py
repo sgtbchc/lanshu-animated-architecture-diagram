@@ -2,7 +2,10 @@
 import argparse
 import importlib.util
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -119,6 +122,40 @@ def check_python_dependencies(root):
     }
 
 
+def resolve_tool(name):
+    executable = shutil.which(name)
+    if executable:
+        return executable
+    candidates = []
+    user_path = os.environ.get("Path", "")
+    for entry in user_path.split(os.pathsep):
+        if entry:
+            candidates.append(Path(entry) / f"{name}.exe")
+            candidates.append(Path(entry) / name)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        winget_packages = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+        candidates.extend(winget_packages.glob(f"**/{name}.exe"))
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def check_ffprobe_available(root):
+    executable = resolve_tool("ffprobe")
+    if not executable:
+        return {"name": "ffprobe_available", "ok": False, "path": None}
+    completed = subprocess.run([executable, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    first_line = completed.stdout.splitlines()[0] if completed.stdout else ""
+    return {
+        "name": "ffprobe_available",
+        "ok": completed.returncode == 0,
+        "path": executable,
+        "version": first_line,
+    }
+
+
 def check_no_machine_local_paths(root):
     local_roots = {str(Path.home())}
     try:
@@ -172,6 +209,7 @@ def run_checks(root):
         check_preview_gifs(root),
         check_default_spec(root),
         check_python_dependencies(root),
+        check_ffprobe_available(root),
         check_no_machine_local_paths(root),
         check_font_candidates_start_with_bundled_assets(root),
     ]

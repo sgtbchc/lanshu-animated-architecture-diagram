@@ -32,6 +32,8 @@ class RenderOutputChecksTest(unittest.TestCase):
         check_names = {check["name"] for check in checks["checks"]}
         self.assertIn("font_assets_available", check_names)
         self.assertIn("font_render_readable", check_names)
+        self.assertIn("ffprobe_available", check_names)
+        self.assertIn("ffprobe_media_parameters", check_names)
 
     def test_contract_checks_report_invalid_excalidraw_font(self):
         with tempfile.TemporaryDirectory() as tmp:

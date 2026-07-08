@@ -36,10 +36,10 @@ python /path/to/skill/scripts/render_animated_diagram.py \
 ```
 
 4. Validate before delivery.
-   - Use `--check` to confirm PNG/GIF dimensions, FPS, frame count, animation motion, bundled font availability, and Excalidraw output contracts.
+   - Use `--check` to confirm PNG/GIF dimensions, FPS, frame count, animation motion, bundled font availability, ffprobe media metadata, and Excalidraw output contracts.
    - Use `--verify` output to prove the GIF is not static.
-   - Use `scripts/check_portability.py` when moving or reinstalling the skill to confirm all required assets and Python dependencies are present.
-   - Optionally use `ffprobe` for independent media inspection when it is already available.
+   - Use `scripts/check_portability.py` when moving or reinstalling the skill to confirm all required assets, Python dependencies, and independent media inspection tools are present.
+   - Treat `ffprobe` as the independent media verifier for GIF metadata. Avoid relying on the renderer's own Pillow checks as the only evidence chain.
    - Confirm bundled font assets are present and readable; `--check` validates this with probe text so Windows does not silently fall back to tiny PIL default fonts.
    - Confirm `.excalidraw` JSON has unique IDs, text uses `fontFamily: 5`, and `files` is empty. `--check` validates these output contracts automatically.
    - Open the PNG preview visually and fix overlap, cramped text, or weak hierarchy.
@@ -73,7 +73,7 @@ If the subject has more than three stages, group adjacent steps into three core 
 
 ## Verification Commands
 
-Use these checks after rendering. `--check` is the primary cross-platform verification path:
+Use these checks after rendering. `--check` combines renderer-side checks with an independent `ffprobe` media metadata check:
 
 ```bash
 python /path/to/skill/scripts/check_portability.py /path/to/skill
@@ -88,7 +88,7 @@ python /path/to/skill/scripts/render_animated_diagram.py \
   --check
 ```
 
-If `ffprobe` is installed, use it as an optional independent media inspection:
+You can also run `ffprobe` directly to inspect a GIF by hand:
 
 ```bash
 ffprobe -v error -select_streams v:0 -count_frames \

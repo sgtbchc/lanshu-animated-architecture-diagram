@@ -145,8 +145,8 @@ The `--verify` flag prints sampled frame differences. Nonzero changed pixels con
 The `--check` flag validates the generated PNG, GIF, and Excalidraw output
 contract and exits nonzero if a required property fails. It checks dimensions,
 GIF frame count and frame duration, sampled GIF motion, unique Excalidraw IDs,
-text font family, bundled font availability/readability, and that no external
-files are embedded.
+text font family, bundled font availability/readability, independent `ffprobe`
+media metadata, and that no external files are embedded.
 
 ## Spec Structure
 
@@ -198,9 +198,10 @@ python scripts/check_portability.py
 ```
 
 The portability check validates required files, bundled fonts, preview GIFs,
-default spec JSON, Python/Pillow availability, and machine-local path leaks.
+default spec JSON, Python/Pillow availability, `ffprobe` availability, and
+machine-local path leaks.
 
-Optional independent media inspection, if `ffprobe` is installed:
+Manual independent media inspection:
 
 ```bash
 ffprobe -v error -select_streams v:0 -count_frames \
@@ -226,6 +227,7 @@ Required:
 
 - Python 3.9+
 - Pillow 10.0.0+
+- FFmpeg/ffprobe for independent media metadata verification
 - Bundled fonts in `assets/fonts/`
 
 Install Python packages with:
@@ -236,7 +238,6 @@ python3 -m pip install -r requirements.txt
 
 Optional:
 
-- `ffprobe` for independent media inspection
 - Excalidraw web app or editor plugin for manual editing of generated `.excalidraw` files
 
 ## Project Layout
