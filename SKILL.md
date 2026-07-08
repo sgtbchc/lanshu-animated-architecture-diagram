@@ -19,13 +19,17 @@ Use the bundled renderer for deterministic output. Avoid external icon libraries
    - For an article or long post, identify the core architecture, actors, stages, data flow, decisions, and final outputs.
    - For a reference image, preserve the visual grammar: title structure, panels, arrows, density, and signature placement.
 
-2. Create a spec JSON.
+2. Confirm output parameters.
+   - 生成 spec 之前，主动询问用户是否有参数要求；至少覆盖画布尺寸、`canvas.duration_seconds`、`canvas.fps`、签名/品牌位、输出 basename。
+   - 如果用户没有明确要求时，沿用 `assets/default-spec.json` 的默认模板值，不要自行发明新的尺寸、时长或 FPS。
+
+3. Create a spec JSON.
    - Start from `assets/default-spec.json`.
    - Keep labels short. Read `references/spec-format.md` when field details or copy length guidance are needed.
    - Use the user’s language for explanatory labels unless the reference style clearly calls for English titles.
    - Prefer `canvas.duration_seconds` plus `canvas.fps: "auto"` for GIF timing. Use explicit GIF-safe FPS values such as `10`, `20`, `25`, or `50` only when the user asks for a specific cadence.
 
-3. Render the outputs.
+4. Render the outputs.
 
 ```bash
 python /path/to/skill/scripts/render_animated_diagram.py \
@@ -36,7 +40,7 @@ python /path/to/skill/scripts/render_animated_diagram.py \
   --check
 ```
 
-4. Validate before delivery.
+5. Validate before delivery.
    - Use `--check` to confirm PNG/GIF dimensions, FPS, frame count, animation motion, bundled font availability, ffprobe media metadata, and Excalidraw output contracts.
    - Treat GIF timing as resolved output: if `duration_seconds` is set, the renderer computes frame count; `--check` verifies the actual GIF metadata against the resolved timing.
    - Use `--verify` output to prove the GIF is not static.
@@ -46,7 +50,7 @@ python /path/to/skill/scripts/render_animated_diagram.py \
    - Confirm `.excalidraw` JSON has unique IDs, text uses `fontFamily: 5`, and `files` is empty. `--check` validates these output contracts automatically.
    - Open the PNG preview visually and fix overlap, cramped text, or weak hierarchy.
 
-5. Deliver the three files.
+6. Deliver the three files.
    - Show the GIF preview when the interface supports local images.
    - Link the PNG and `.excalidraw` source.
 
