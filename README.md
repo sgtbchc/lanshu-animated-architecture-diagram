@@ -69,9 +69,9 @@ The default canvas is:
 
 ```text
 1210 x 1138
-20 fps
-41 frames
 2.05 seconds
+auto GIF-safe fps -> 20 fps
+resolved frames -> 41
 ```
 
 ## Quick Start
@@ -147,6 +147,37 @@ contract and exits nonzero if a required property fails. It checks dimensions,
 GIF frame count and frame duration, sampled GIF motion, unique Excalidraw IDs,
 text font family, bundled font availability/readability, independent `ffprobe`
 media metadata, and that no external files are embedded.
+
+## Animation Timing
+
+Prefer declaring the target duration and letting the renderer compute the frame
+count:
+
+```json
+"canvas": {
+  "width": 1210,
+  "height": 1138,
+  "duration_seconds": 4,
+  "fps": "auto"
+}
+```
+
+With `fps: "auto"`, the renderer chooses a GIF-safe cadence. For short GIFs it
+uses 20 FPS; for longer GIFs it lowers the cadence to 10 FPS to avoid producing
+unnecessarily large files. You can also set an explicit GIF-safe FPS such as
+`10`, `20`, `25`, or `50`.
+
+GIF frame delays are stored in centiseconds, so common video values such as
+`24`, `30`, or `60` FPS cannot be represented exactly in a GIF. The renderer
+fails early for unsafe FPS values instead of producing metadata that later fails
+`ffprobe`.
+
+Legacy specs can still use explicit `frames` plus a GIF-safe `fps`. Duration is
+computed as:
+
+```text
+duration_seconds = frames / fps
+```
 
 ## Spec Structure
 

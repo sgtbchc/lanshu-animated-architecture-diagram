@@ -47,6 +47,31 @@ Text fitting is applied to:
 Manual line breaks in the spec are preserved. English text wraps on spaces,
 while CJK text can wrap between characters when needed.
 
+## Animation Timing
+
+Prefer target-duration specs:
+
+```json
+"canvas": {
+  "width": 1210,
+  "height": 1138,
+  "duration_seconds": 4,
+  "fps": "auto"
+}
+```
+
+Rules:
+
+- `duration_seconds` is the target GIF length.
+- `fps: "auto"` chooses a GIF-safe FPS and derives `frames`.
+- Explicit `fps` must be GIF-safe, such as `10`, `20`, `25`, or `50`.
+- Avoid `24`, `30`, and `60` FPS for GIF output; GIF frame delays are stored in
+  centiseconds, so those values cannot be represented exactly.
+- Legacy `frames` plus GIF-safe `fps` still works. The duration is `frames / fps`.
+
+If both `duration_seconds` and `frames` are present, they must agree after the
+renderer derives `round(duration_seconds * fps)`.
+
 ## Icons
 
 Supported icon keys:
@@ -72,7 +97,7 @@ The output should include:
 Verify:
 
 - GIF dimensions match the requested canvas
-- GIF has the requested frame count and FPS
+- GIF has the resolved frame count, FPS, and duration
 - Frame-diff shows real motion
 - Excalidraw JSON has unique IDs
 - All text elements use `fontFamily: 5`

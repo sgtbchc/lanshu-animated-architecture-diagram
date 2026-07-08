@@ -16,6 +16,9 @@ DEFAULT_W = 1210
 DEFAULT_H = 1138
 DEFAULT_FRAMES = 41
 DEFAULT_FPS = 20
+RECOMMENDED_GIF_SAFE_FPS = (10, 20, 25, 50)
+LONG_DURATION_AUTO_FPS_THRESHOLD_SECONDS = 4
+LONG_DURATION_AUTO_FPS = 10
 SCALE = 2
 UPDATED = 1782475200000
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -41,6 +44,98 @@ THEME = {
     "source_fill": "#02160a",
     "pack_fill": "#04180d",
 }
+
+
+def clean_number(value):
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+def parse_positive_float(value, field_name):
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be a positive number, not a boolean.")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be a positive number.") from exc
+    if not math.isfinite(number) or number <= 0:
+        raise ValueError(f"{field_name} must be a positive number.")
+    return number
+
+
+def parse_positive_int(value, field_name):
+    number = parse_positive_float(value, field_name)
+    if not number.is_integer():
+        raise ValueError(f"{field_name} must be a whole number.")
+    return int(number)
+
+
+def is_auto_value(value):
+    return isinstance(value, str) and value.strip().lower() == "auto"
+
+
+def choose_auto_fps(duration_seconds):
+    if duration_seconds is not None and duration_seconds > LONG_DURATION_AUTO_FPS_THRESHOLD_SECONDS:
+        return LONG_DURATION_AUTO_FPS
+    return DEFAULT_FPS
+
+
+def gif_frame_duration_ms_for_fps(fps):
+    delay_centiseconds = 100 / fps
+    rounded_delay_centiseconds = round(delay_centiseconds)
+    if not math.isclose(delay_centiseconds, rounded_delay_centiseconds, rel_tol=0, abs_tol=1e-9) or rounded_delay_centiseconds < 1:
+        recommended = ", ".join(str(value) for value in RECOMMENDED_GIF_SAFE_FPS)
+        raise ValueError(
+            f"canvas.fps={clean_number(fps)} is not GIF-safe. GIF frame delays are stored in centiseconds; "
+            f"use one of {recommended}, or set canvas.fps to 'auto'."
+        )
+    return int(rounded_delay_centiseconds * 10)
+
+
+def resolve_animation_timing(spec):
+    canvas = spec.get("canvas", {})
+    raw_duration = canvas.get("duration_seconds")
+    has_duration = raw_duration is not None
+    target_duration_seconds = parse_positive_float(raw_duration, "canvas.duration_seconds") if has_duration else None
+
+    raw_fps = canvas.get("fps")
+    if raw_fps is None or is_auto_value(raw_fps):
+        fps = choose_auto_fps(target_duration_seconds)
+    else:
+        fps = parse_positive_float(raw_fps, "canvas.fps")
+    gif_frame_duration_ms = gif_frame_duration_ms_for_fps(fps)
+
+    raw_frames = canvas.get("frames")
+    if has_duration:
+        derived_frames = int(round(target_duration_seconds * fps))
+        if derived_frames < 2:
+            raise ValueError("canvas.duration_seconds is too short for the selected fps; render at least 2 frames.")
+        if raw_frames is not None:
+            explicit_frames = parse_positive_int(raw_frames, "canvas.frames")
+            if explicit_frames != derived_frames:
+                raise ValueError(
+                    "canvas.frames conflicts with canvas.duration_seconds and canvas.fps; "
+                    f"remove canvas.frames or set it to {derived_frames}."
+                )
+            frames = explicit_frames
+        else:
+            frames = derived_frames
+    else:
+        frames = parse_positive_int(raw_frames if raw_frames is not None else DEFAULT_FRAMES, "canvas.frames")
+        if frames < 2:
+            raise ValueError("canvas.frames must be at least 2 for animation.")
+
+    actual_duration_seconds = frames / fps
+    return {
+        "fps": clean_number(fps),
+        "frames": frames,
+        "duration_seconds": round(actual_duration_seconds, 6),
+        "target_duration_seconds": round(target_duration_seconds, 6) if target_duration_seconds is not None else None,
+        "gif_frame_duration_ms": gif_frame_duration_ms,
+    }
+
+
+def load_spec(path):
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
 
 
 def hex_rgba(value, alpha=255):
@@ -683,17 +778,19 @@ def animate_frame(base, idx, total):
 
 def write_outputs(spec, outdir, basename):
     outdir.mkdir(parents=True, exist_ok=True)
+    timing = resolve_animation_timing(spec)
     ex, static = render_static(spec)
     final = premium_finish(static)
     png_path = outdir / f"{basename}.png"
     gif_path = outdir / f"{basename}.gif"
     excalidraw_path = outdir / f"{basename}.excalidraw"
     final.save(png_path, "PNG")
-    frames = [animate_frame(final, i, spec.get("canvas", {}).get("frames", DEFAULT_FRAMES)) for i in range(spec.get("canvas", {}).get("frames", DEFAULT_FRAMES))]
-    duration = int(1000 / spec.get("canvas", {}).get("fps", DEFAULT_FPS))
+    frame_count = timing["frames"]
+    frames = [animate_frame(final, i, frame_count) for i in range(frame_count)]
+    duration = timing["gif_frame_duration_ms"]
     frames[0].save(gif_path, save_all=True, append_images=frames[1:], duration=duration, loop=0, optimize=False)
     ex.write(excalidraw_path)
-    return {"png": str(png_path), "gif": str(gif_path), "excalidraw": str(excalidraw_path), "elements": len(ex.elements)}
+    return {"png": str(png_path), "gif": str(gif_path), "excalidraw": str(excalidraw_path), "elements": len(ex.elements), "timing": timing}
 
 
 def frame_diff_report(gif_path):
@@ -800,8 +897,10 @@ def check_outputs(result, spec):
     canvas = spec.get("canvas", {})
     expected_width = canvas.get("width", DEFAULT_W)
     expected_height = canvas.get("height", DEFAULT_H)
-    expected_frames = canvas.get("frames", DEFAULT_FRAMES)
-    expected_fps = canvas.get("fps", DEFAULT_FPS)
+    expected_timing = resolve_animation_timing(spec)
+    expected_frames = expected_timing["frames"]
+    expected_fps = expected_timing["fps"]
+    expected_frame_duration_ms = expected_timing["gif_frame_duration_ms"]
 
     checks = []
 
@@ -818,13 +917,13 @@ def check_outputs(result, spec):
             {"name": "gif_width", "ok": gif_width == expected_width, "expected": expected_width, "actual": gif_width},
             {"name": "gif_height", "ok": gif_height == expected_height, "expected": expected_height, "actual": gif_height},
             {"name": "gif_frames", "ok": gif_frames == expected_frames, "expected": expected_frames, "actual": gif_frames},
-            {"name": "gif_fps", "ok": duration_ms == int(1000 / expected_fps), "expected": expected_fps, "actual": actual_fps},
+            {"name": "gif_fps", "ok": duration_ms == expected_frame_duration_ms, "expected": expected_fps, "actual": actual_fps},
         ]
     )
 
     ffprobe_report = ffprobe_media_report(gif_path)
     checks.append({"name": "ffprobe_available", "ok": ffprobe_report.get("available", False), "path": ffprobe_report.get("path")})
-    expected_duration = expected_frames / expected_fps
+    expected_duration = expected_timing["duration_seconds"]
     checks.append(
         {
             "name": "ffprobe_media_parameters",
@@ -922,7 +1021,7 @@ def main():
     parser.add_argument("--check", action="store_true", help="Validate PNG, GIF, and Excalidraw output contracts; exits nonzero on failure.")
     args = parser.parse_args()
 
-    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    spec = load_spec(args.spec)
     result = write_outputs(spec, Path(args.outdir), args.basename)
     if args.verify:
         result["verification"] = frame_diff_report(result["gif"])

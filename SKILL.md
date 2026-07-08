@@ -23,6 +23,7 @@ Use the bundled renderer for deterministic output. Avoid external icon libraries
    - Start from `assets/default-spec.json`.
    - Keep labels short. Read `references/spec-format.md` when field details or copy length guidance are needed.
    - Use the user’s language for explanatory labels unless the reference style clearly calls for English titles.
+   - Prefer `canvas.duration_seconds` plus `canvas.fps: "auto"` for GIF timing. Use explicit GIF-safe FPS values such as `10`, `20`, `25`, or `50` only when the user asks for a specific cadence.
 
 3. Render the outputs.
 
@@ -37,6 +38,7 @@ python /path/to/skill/scripts/render_animated_diagram.py \
 
 4. Validate before delivery.
    - Use `--check` to confirm PNG/GIF dimensions, FPS, frame count, animation motion, bundled font availability, ffprobe media metadata, and Excalidraw output contracts.
+   - Treat GIF timing as resolved output: if `duration_seconds` is set, the renderer computes frame count; `--check` verifies the actual GIF metadata against the resolved timing.
    - Use `--verify` output to prove the GIF is not static.
    - Use `scripts/check_portability.py` when moving or reinstalling the skill to confirm all required assets, Python dependencies, and independent media inspection tools are present.
    - Treat `ffprobe` as the independent media verifier for GIF metadata. Avoid relying on the renderer's own Pillow checks as the only evidence chain.
@@ -59,6 +61,19 @@ python /path/to/skill/scripts/render_animated_diagram.py \
 - Use built-in simple icons: `folder`, `file`, `scan`, `shield`, `db`, `hash`, `package`.
 
 ## Spec Authoring Hints
+
+Animation timing is configurable. To request a four-second GIF, use:
+
+```json
+"canvas": {
+  "width": 1210,
+  "height": 1138,
+  "duration_seconds": 4,
+  "fps": "auto"
+}
+```
+
+Use `fps: "auto"` unless the user needs a specific cadence. GIF frame delays are stored in centiseconds, so values such as `30` FPS and `60` FPS are not reliable for exact metadata; the renderer rejects unsafe values early. Legacy specs with explicit `frames` plus GIF-safe `fps` still work.
 
 Map common content to the fixed layout:
 

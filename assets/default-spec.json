@@ -2,8 +2,8 @@
   "canvas": {
     "width": 1210,
     "height": 1138,
-    "fps": 20,
-    "frames": 41
+    "duration_seconds": 2.05,
+    "fps": "auto"
   },
   "signature": "@岚叔",
   "title": {
