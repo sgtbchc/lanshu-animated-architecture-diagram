@@ -52,6 +52,7 @@ The default visual system uses a dark canvas, moving flow highlights, pulsing mo
 - Uses local Python rendering through Pillow
 - Does not require Excalidraw, browser automation, ImageMagick, remote APIs, or external icon libraries
 - Includes frame-diff verification to prove GIF motion
+- Bundles OFL fonts for stable Windows/macOS/Linux PNG/GIF rendering
 - Uses a fixed high-quality layout for clean technical storytelling
 
 ## Outputs
@@ -144,7 +145,8 @@ The `--verify` flag prints sampled frame differences. Nonzero changed pixels con
 The `--check` flag validates the generated PNG, GIF, and Excalidraw output
 contract and exits nonzero if a required property fails. It checks dimensions,
 GIF frame count and frame duration, sampled GIF motion, unique Excalidraw IDs,
-text font family, and that no external files are embedded.
+text font family, bundled font availability/readability, and that no external
+files are embedded.
 
 ## Spec Structure
 
@@ -192,6 +194,15 @@ python3 ${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_v
 Validate GIF media parameters:
 
 ```bash
+python scripts/check_portability.py
+```
+
+The portability check validates required files, bundled fonts, preview GIFs,
+default spec JSON, Python/Pillow availability, and machine-local path leaks.
+
+Optional independent media inspection, if `ffprobe` is installed:
+
+```bash
 ffprobe -v error -select_streams v:0 -count_frames \
   -show_entries stream=width,height,r_frame_rate,avg_frame_rate,nb_read_frames \
   -show_entries format=duration \
@@ -215,6 +226,7 @@ Required:
 
 - Python 3.9+
 - Pillow 10.0.0+
+- Bundled fonts in `assets/fonts/`
 
 Install Python packages with:
 
@@ -224,7 +236,7 @@ python3 -m pip install -r requirements.txt
 
 Optional:
 
-- `ffprobe` for media inspection
+- `ffprobe` for independent media inspection
 - Excalidraw web app or editor plugin for manual editing of generated `.excalidraw` files
 
 ## Project Layout

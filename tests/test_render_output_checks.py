@@ -29,6 +29,9 @@ class RenderOutputChecksTest(unittest.TestCase):
             checks = self.renderer.check_outputs(result, self.spec)
 
         self.assertTrue(checks["ok"], checks)
+        check_names = {check["name"] for check in checks["checks"]}
+        self.assertIn("font_assets_available", check_names)
+        self.assertIn("font_render_readable", check_names)
 
     def test_contract_checks_report_invalid_excalidraw_font(self):
         with tempfile.TemporaryDirectory() as tmp:

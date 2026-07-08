@@ -36,8 +36,11 @@ python /path/to/skill/scripts/render_animated_diagram.py \
 ```
 
 4. Validate before delivery.
-   - Confirm GIF dimensions, FPS, frame count, and duration with `ffprobe`.
-   - Use `--verify` output or `--check` to prove the GIF is not static.
+   - Use `--check` to confirm PNG/GIF dimensions, FPS, frame count, animation motion, bundled font availability, and Excalidraw output contracts.
+   - Use `--verify` output to prove the GIF is not static.
+   - Use `scripts/check_portability.py` when moving or reinstalling the skill to confirm all required assets and Python dependencies are present.
+   - Optionally use `ffprobe` for independent media inspection when it is already available.
+   - Confirm bundled font assets are present and readable; `--check` validates this with probe text so Windows does not silently fall back to tiny PIL default fonts.
    - Confirm `.excalidraw` JSON has unique IDs, text uses `fontFamily: 5`, and `files` is empty. `--check` validates these output contracts automatically.
    - Open the PNG preview visually and fix overlap, cramped text, or weak hierarchy.
 
@@ -70,13 +73,10 @@ If the subject has more than three stages, group adjacent steps into three core 
 
 ## Verification Commands
 
-Use these checks after rendering:
+Use these checks after rendering. `--check` is the primary cross-platform verification path:
 
 ```bash
-ffprobe -v error -select_streams v:0 -count_frames \
-  -show_entries stream=width,height,r_frame_rate,avg_frame_rate,nb_read_frames \
-  -show_entries format=duration \
-  -of default=noprint_wrappers=1 output.gif
+python /path/to/skill/scripts/check_portability.py /path/to/skill
 ```
 
 ```bash
@@ -86,6 +86,15 @@ python /path/to/skill/scripts/render_animated_diagram.py \
   --basename diagram \
   --verify \
   --check
+```
+
+If `ffprobe` is installed, use it as an optional independent media inspection:
+
+```bash
+ffprobe -v error -select_streams v:0 -count_frames \
+  -show_entries stream=width,height,r_frame_rate,avg_frame_rate,nb_read_frames \
+  -show_entries format=duration \
+  -of default=noprint_wrappers=1 output.gif
 ```
 
 The `--verify` report should show nonzero changed pixels between sampled GIF frames.

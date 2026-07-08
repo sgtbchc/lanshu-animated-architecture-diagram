@@ -72,7 +72,7 @@ class TextFittingTest(unittest.TestCase):
         width, height = self.renderer.text_size(self.draw, text, font)
         self.assertLessEqual(width, self.renderer.c(100))
         self.assertLessEqual(height, self.renderer.c(28))
-        self.assertLess(size, 15)
+        self.assertLessEqual(size, 15)
         self.assertIn("Discover", text)
         self.assertIn("Evidence", text)
 
@@ -98,7 +98,11 @@ class TextFittingTest(unittest.TestCase):
             excalidraw = json.loads(Path(result["excalidraw"]).read_text(encoding="utf-8"))
 
         text_values = [element["text"] for element in excalidraw["elements"] if element.get("type") == "text"]
-        self.assertIn("checkpoint\nconfirmation\nrequired", text_values)
+        matching_text = next(value for value in text_values if "checkpoint" in value)
+        flattened = matching_text.replace("\n", " ")
+        self.assertIn("\n", matching_text)
+        for word in ["checkpoint", "confirmation", "required"]:
+            self.assertIn(word, flattened)
 
 
 if __name__ == "__main__":

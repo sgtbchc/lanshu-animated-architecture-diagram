@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+import os
 import random
 import sys
 from pathlib import Path
@@ -15,6 +16,8 @@ DEFAULT_FRAMES = 41
 DEFAULT_FPS = 20
 SCALE = 2
 UPDATED = 1782475200000
+ROOT_DIR = Path(__file__).resolve().parents[1]
+FONT_DIR = ROOT_DIR / "assets" / "fonts"
 
 THEME = {
     "bg": "#000000",
@@ -52,23 +55,42 @@ def scaled_box(x, y, w, h):
 
 
 def font_candidates(hand=False, cjk=False, bold=False):
+    windows_fonts = Path(os.environ.get("WINDIR", "C:\\Windows")) / "Fonts"
+    bundled_hand = [FONT_DIR / "PatrickHand-Regular.ttf"]
+    bundled_cjk = [
+        FONT_DIR / ("LXGWWenKai-Medium.ttf" if bold else "LXGWWenKai-Regular.ttf"),
+        FONT_DIR / "LXGWWenKai-Regular.ttf",
+    ]
     if hand:
-        return [
+        return [str(path) for path in bundled_hand + bundled_cjk] + [
+            str(windows_fonts / "segoeprb.ttf"),
+            str(windows_fonts / "segoepr.ttf"),
+            str(windows_fonts / "comic.ttf"),
+            str(windows_fonts / "comicbd.ttf"),
             "/System/Library/Fonts/Supplemental/Chalkduster.ttf",
             "/System/Library/Fonts/MarkerFelt.ttc",
             "/System/Library/Fonts/Noteworthy.ttc",
             "/System/Library/Fonts/Supplemental/Bradley Hand Bold.ttf",
         ]
     if cjk:
-        return [
+        return [str(path) for path in bundled_cjk] + [
+            str(windows_fonts / ("msyhbd.ttc" if bold else "msyh.ttc")),
+            str(windows_fonts / "simhei.ttf"),
+            str(windows_fonts / "simsun.ttc"),
             "/System/Library/Fonts/STHeiti Medium.ttc" if bold else "/System/Library/Fonts/STHeiti Light.ttc",
             "/System/Library/Fonts/Hiragino Sans GB.ttc",
             "/Library/Fonts/Arial Unicode.ttf",
             "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
         ]
-    return [
+    return [str(path) for path in bundled_hand] + [
+        str(windows_fonts / ("arialbd.ttf" if bold else "arial.ttf")),
+        str(windows_fonts / ("segoeuib.ttf" if bold else "segoeui.ttf")),
         "/System/Library/Fonts/Helvetica.ttc",
         "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     ]
 
 
@@ -79,6 +101,14 @@ def load_font(size, hand=False, cjk=False, bold=False):
         except OSError:
             continue
     return ImageFont.load_default()
+
+
+def required_font_assets():
+    return {
+        "hand": FONT_DIR / "PatrickHand-Regular.ttf",
+        "cjk_regular": FONT_DIR / "LXGWWenKai-Regular.ttf",
+        "cjk_bold": FONT_DIR / "LXGWWenKai-Medium.ttf",
+    }
 
 
 def has_cjk(text):
@@ -476,7 +506,7 @@ def render_static(spec):
     draw_rect(ex, draw, 389, 138, 430, 101, THEME["green"], None, 2, 8)
     draw_text(ex, draw, spec.get("input_title", "Source / Input"), 498, 144, 210, 31, 22, THEME["white"], "center", hand=True, bold=True)
     for x, item in zip([423, 532, 640, 748], inputs[:4]):
-        small_input(ex, draw, x, 180, item)
+        small_input(ex, draw, x, 170, item)
     draw_line(ex, draw, [(605, 239), (605, 316)], THEME["white"], 2, "solid", True)
 
     core = spec.get("core", {})
@@ -744,6 +774,34 @@ def check_outputs(result, spec):
             {"name": "png_width", "ok": png_width == expected_width, "expected": expected_width, "actual": png_width},
             {"name": "png_height", "ok": png_height == expected_height, "expected": expected_height, "actual": png_height},
         ]
+    )
+
+    font_assets = required_font_assets()
+    missing_fonts = [name for name, path in font_assets.items() if not path.is_file() or path.stat().st_size == 0]
+    checks.append(
+        {
+            "name": "font_assets_available",
+            "ok": not missing_fonts,
+            "missing": missing_fonts,
+        }
+    )
+    font_probe = Image.new("RGBA", (1200, 300), (0, 0, 0, 0))
+    font_draw = ImageDraw.Draw(font_probe)
+    hand_font = load_font(47, hand=True, bold=True)
+    cjk_font = load_font(24, cjk=True, bold=True)
+    hand_width, hand_height = text_size(font_draw, "Memory Pack", hand_font)
+    cjk_width, cjk_height = text_size(font_draw, "记忆资产归档流程", cjk_font)
+    checks.append(
+        {
+            "name": "font_render_readable",
+            "ok": hand_width > c(200) and hand_height > c(35) and cjk_width > c(150) and cjk_height > c(20),
+            "measurements": {
+                "hand_width": hand_width,
+                "hand_height": hand_height,
+                "cjk_width": cjk_width,
+                "cjk_height": cjk_height,
+            },
+        }
     )
 
     return {"ok": all(check["ok"] for check in checks), "checks": checks}
